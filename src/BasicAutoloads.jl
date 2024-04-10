@@ -54,29 +54,54 @@ end
 """
 function register_autoloads(autoloads::Vector{Pair{Vector{String}, Expr}})
     isinteractive() || return
-    REPL = get(Base.loaded_modules, Base.PkgId(Base.UUID("3fa0cd96-eef1-5676-8a61-b3b8758bbffb"), "REPL"), nothing)
-    REPL === nothing && return
     dict = Dict{Symbol, Expr}(Symbol(k) => v for (ks, v) in autoloads for k in ks)
     already_ran = Set{Expr}()
     autoload(expr) = _for_each_symbol(expr) do sym::Symbol
-        target = get(dict, expr.args[1], nothing)
+        target = get(dict, sym, nothing)
         target === nothing && return
         target in already_ran && return
         push!(already_ran, target)
-        @info "BasicAutoloads is running `$target`..."
+        @info "running `$target`..."
         try
             Main.eval(target)
         catch err
             @info "Failed to rung `$target`" exception=err
         end
     end
-    pushfirst!(REPL.repl_ast_transforms, autoload)
+
+    # Enable loading before or after the REPL, but always error fast.
+    # Once a REPL is started, it no longer interacts with REPL.repl_ast_transforms
+    _afterreplinit() do repl
+        pushfirst!(repl.ast_transforms, autoload)
+    end
+end
+
+function _afterreplinit(f)
+    if isdefined(Base, :active_repl_backend)
+        f(Base.active_repl_backend)
+    else
+        t = @async begin
+            iter = 0
+            while !isdefined(Base, :active_repl_backend) && iter < 20
+                sleep(.05)
+                iter += 1
+            end
+            if isdefined(Base, :active_repl_backend)
+                f(Base.active_repl_backend)
+            else
+                @warn "Failed to find Base.active_repl_backend"
+            end
+        end
+        isdefined(Base, :errormonitor) && Base.errormonitor(t)
+    end
     nothing
 end
 
 function _for_each_symbol(f, expr)
     if expr isa Expr
-        foreach(_for_each_symbol, expr.args)
+        for arg in expr.args
+            _for_each_symbol(f, arg)
+        end
     elseif expr isa Symbol
         f(expr)
     end
@@ -85,5 +110,6 @@ end
 
 precompile(register_autoloads, (Vector{Pair{Vector{String}, Expr}},))
 precompile(Base.vect, (Pair{Array{String, 1}, Expr}, Vararg{Pair{Array{String, 1}, Expr}},))
+# precompile(_for_each_symbol)
 
 end
