@@ -53,14 +53,23 @@ end
 ```
 """
 function register_autoloads(autoloads::Vector{Pair{Vector{String}, Expr}})
-    isinteractive() || return
-    dict = Dict{Symbol, Expr}(Symbol(k) => v for (ks, v) in autoloads for k in ks)
-    already_ran = Set{Expr}()
-    autoload(expr) = _for_each_symbol(expr) do sym::Symbol
-        target = get(dict, sym, nothing)
-        target === nothing && return
-        target in already_ran && return
-        push!(already_ran, target)
+    isinteractive() && _register_ast_transform(_Autoload(autoloads))
+    nothing
+end
+
+struct _Autoload # These callable structs are to enable precompilation.
+    dict::Dict{Symbol, Expr}
+    already_ran::Set{Expr}
+    _Autoload(autoloads) = new(Dict{Symbol, Expr}(Symbol(k) => v for (ks, v) in autoloads for k in ks), Set{Expr}())
+end
+function (al::_Autoload)(@nospecialize(expr))
+    if expr isa Expr
+        foreach(al, expr.args)
+    elseif expr isa Symbol
+        target = get(al.dict, expr, nothing)
+        target === nothing && return expr
+        target in al.already_ran && return expr
+        push!(al.already_ran, target)
         @info "running `$target`..."
         try
             Main.eval(target)
@@ -68,48 +77,38 @@ function register_autoloads(autoloads::Vector{Pair{Vector{String}, Expr}})
             @info "Failed to rung `$target`" exception=err
         end
     end
-
-    # Enable loading before or after the REPL, but always error fast.
-    # Once a REPL is started, it no longer interacts with REPL.repl_ast_transforms
-    _afterreplinit() do repl
-        pushfirst!(repl.ast_transforms, autoload)
-    end
-end
-
-function _afterreplinit(f)
-    if isdefined(Base, :active_repl_backend)
-        f(Base.active_repl_backend)
-    else
-        t = @async begin
-            iter = 0
-            while !isdefined(Base, :active_repl_backend) && iter < 20
-                sleep(.05)
-                iter += 1
-            end
-            if isdefined(Base, :active_repl_backend)
-                f(Base.active_repl_backend)
-            else
-                @warn "Failed to find Base.active_repl_backend"
-            end
-        end
-        isdefined(Base, :errormonitor) && Base.errormonitor(t)
-    end
-    nothing
-end
-
-function _for_each_symbol(f, expr)
-    if expr isa Expr
-        for arg in expr.args
-            _for_each_symbol(f, arg)
-        end
-    elseif expr isa Symbol
-        f(expr)
-    end
     expr
 end
 
-precompile(register_autoloads, (Vector{Pair{Vector{String}, Expr}},))
-precompile(Base.vect, (Pair{Array{String, 1}, Expr}, Vararg{Pair{Array{String, 1}, Expr}},))
-# precompile(_for_each_symbol)
+function _register_ast_transform(ast_transform)
+    if isdefined(Base, :active_repl_backend)
+        pushfirst!(Base.active_repl_backend.ast_transforms, ast_transform)
+    else
+        t = Task(_WaitRegisterASTTransform(ast_transform))
+        schedule(t)
+        isdefined(Base, :errormonitor) && Base.errormonitor(t)
+    end
+end
+
+struct _WaitRegisterASTTransform{T}
+    ast_transform::T
+end
+function (wrat::_WaitRegisterASTTransform)()
+    iter = 0
+    while !isdefined(Base, :active_repl_backend) && iter < 20
+        sleep(.05)
+        iter += 1
+    end
+    if isdefined(Base, :active_repl_backend)
+        pushfirst!(Base.active_repl_backend.ast_transforms, wrat.ast_transform)
+    else
+        @warn "Failed to find Base.active_repl_backend"
+    end
+end
+
+precompile(Tuple{typeof(Base.vect), Pair{Array{String, 1}, Expr}, Vararg{Pair{Array{String, 1}, Expr}}})
+precompile(Tuple{typeof(BasicAutoloads.register_autoloads), Array{Pair{Array{String, 1}, Expr}, 1}})
+precompile(Tuple{BasicAutoloads._WaitRegisterASTTransform{BasicAutoloads._Autoload}})
+precompile(Tuple{BasicAutoloads._Autoload, Any})
 
 end
