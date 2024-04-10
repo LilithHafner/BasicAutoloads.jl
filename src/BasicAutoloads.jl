@@ -58,28 +58,32 @@ function register_autoloads(autoloads::Vector{Pair{Vector{String}, Expr}})
     REPL === nothing && return
     dict = Dict{Symbol, Expr}(Symbol(k) => v for (ks, v) in autoloads for k in ks)
     already_ran = Set{Expr}()
-    function _autoload(expr)
-        if expr isa Expr
-            foreach(_autoload, expr.args)
-        elseif expr isa Symbol
-            target = get(dict, expr.args[1], nothing)
-            target === nothing && return
-            target in already_ran && return
-            push!(already_ran, target)
-            @info "BasicAutoloads is running `$target`..."
-            try
-                Main.eval(target)
-            catch err
-                @info "Failed to rung `$target`" exception=err
-            end
+    autoload(expr) = _for_each_symbol(expr) do sym::Symbol
+        target = get(dict, expr.args[1], nothing)
+        target === nothing && return
+        target in already_ran && return
+        push!(already_ran, target)
+        @info "BasicAutoloads is running `$target`..."
+        try
+            Main.eval(target)
+        catch err
+            @info "Failed to rung `$target`" exception=err
         end
     end
-    autoload(expr) = (_autoload(expr); expr)
     pushfirst!(REPL.repl_ast_transforms, autoload)
     nothing
 end
 
+function _for_each_symbol(f, expr)
+    if expr isa Expr
+        foreach(_for_each_symbol, expr.args)
+    elseif expr isa Symbol
+        f(expr)
+    end
+    expr
+end
+
 precompile(register_autoloads, (Vector{Pair{Vector{String}, Expr}},))
-# 7ms load 18ms run
+precompile(Base.vect, (Pair{Array{String, 1}, Expr}, Vararg{Pair{Array{String, 1}, Expr}},))
 
 end
