@@ -53,7 +53,7 @@ end
 ```
 """
 function register_autoloads(autoloads::Vector{Pair{Vector{String}, Expr}})
-    isinteractive() && _register_ast_transform(_Autoload(autoloads))
+    _register_ast_transform(_Autoload(autoloads))
     nothing
 end
 
@@ -70,11 +70,11 @@ function (al::_Autoload)(@nospecialize(expr))
         target === nothing && return expr
         target in al.already_ran && return expr
         push!(al.already_ran, target)
-        @info "running `$target`..."
+        @info "BasicAutoloads is running `$target`..."
         try
             Main.eval(target)
         catch err
-            @info "Failed to rung `$target`" exception=err
+            @info "Failed to run `$target`" exception=err
         end
     end
     expr
@@ -82,7 +82,11 @@ end
 
 function _register_ast_transform(ast_transform)
     if isdefined(Base, :active_repl_backend)
-        pushfirst!(Base.active_repl_backend.ast_transforms, ast_transform)
+        if isdefined(Base.active_repl_backend, :ast_transforms)
+            pushfirst!(Base.active_repl_backend.ast_transforms, ast_transform)
+        else
+            @warn "Failed to find Base.active_repl_backend.ast_transforms"
+        end
     else
         t = Task(_WaitRegisterASTTransform(ast_transform))
         schedule(t)
@@ -99,10 +103,10 @@ function (wrat::_WaitRegisterASTTransform)()
         sleep(.05)
         iter += 1
     end
-    if isdefined(Base, :active_repl_backend)
+    if isdefined(Base, :active_repl_backend) && isdefined(Base.active_repl_backend, :ast_transforms)
         pushfirst!(Base.active_repl_backend.ast_transforms, wrat.ast_transform)
     else
-        @warn "Failed to find Base.active_repl_backend"
+        @warn "Failed to find Base.active_repl_backend.ast_transforms"
     end
 end
 
