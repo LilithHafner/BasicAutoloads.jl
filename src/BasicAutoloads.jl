@@ -51,6 +51,12 @@ if isinteractive()
     ])
 end
 ```
+
+# Magic
+
+One "magic" thing that attempts to streamline a common case: if the `expr` is
+`:(using SomeModule)`, and the module is already loaded in `Main`, then `expr` is not
+evaluated.
 """
 function register_autoloads(autoloads::Vector{Pair{Vector{String}, Expr}})
     _register_ast_transform(_Autoload(autoloads))
@@ -70,6 +76,7 @@ function (al::_Autoload)(@nospecialize(expr))
         target === nothing && return expr
         target in al.already_ran && return expr
         push!(al.already_ran, target)
+        target isa Expr && target.head == :using && length(target.args) == 1 && only(target.args).head == :. && length(only(target.args).args) == 1 && only(only(target.args).args) isa Symbol && isdefined(Main, only(only(target.args).args)) && getglobal(Main, only(only(target.args).args)) isa Module && return expr # Magic #1
         @info "BasicAutoloads is running `$target`..."
         try
             Main.eval(target)
