@@ -2,25 +2,6 @@ module BasicAutoloads
 
 export register_autoloads
 
-#=
-API design decisions:
-Accept a very narrow type signature to force folks to always use the same approach so that
-features are inherently discoverable. You are certian to know you can X if you are forced
-to do so all the time for X in
-  - provide arbitrary exprs
-  - provide multiple triggers for a single expr
-  - provide macro names as strings instead of symbols
-
-Trivial extensions that I opted not to do
-  - Triggers are scalar or iterables of symbols or strings
-  - Expres are symbols which expand to :(using Sym)
-
-Simple, but nontrivial extensions
-  - Regex as trigger
-  - Function as trigger
-  - Function (that possibly runs multiple times) as expr
-=#
-
 """
     register_autoloads(autoloads::Vector{Pair{Vector{String}, Expr}})
     register_autoloads([
@@ -29,16 +10,19 @@ Simple, but nontrivial extensions
         ...
     ])
 
-Register a expressions to be executed when a trigger is found in the REPL's input.
+Register expressions to be executed when a trigger is found in the REPL's input.
 
 Eech `trigger` must be a `String`. If the `trigger` is found as a symbol (e.g. variable,
 function, or macro name) in an input expression to the REPL, the corresponding `expr` is
 evaluated. Each `expr` must be an `Expr` and is evaluated with `Main.eval(expr)`. Each
 unique `expr`, up to equality, is evaluated at most once.
 
+This function is meant to be called from `~/.julia/config/startup.jl` (or wherever your
+startup.jl file happens to be stored), but will also work if called from the REPL.
+
 # Example
 
-```jldoctest
+```julia
 if isinteractive()
     import BasicAutoloads
     BasicAutoloads.register_autoloads([
@@ -115,3 +99,22 @@ precompile(Tuple{BasicAutoloads._WaitRegisterASTTransform{BasicAutoloads._Autolo
 precompile(Tuple{BasicAutoloads._Autoload, Any})
 
 end
+
+#=
+API design decisions:
+Accept a very narrow type signature to force folks to always use the same approach so that
+features are inherently discoverable. You are certian to know you can X if you are forced
+to do so all the time for X in
+  - provide arbitrary exprs
+  - provide multiple triggers for a single expr
+  - provide macro names as strings instead of symbols
+
+Trivial extensions that I opted not to do
+  - Triggers are scalar or iterables of symbols or strings
+  - Expres are symbols which expand to :(using Sym)
+
+Simple, but nontrivial extensions
+  - Regex as trigger
+  - Function as trigger
+  - Function (that possibly runs multiple times) as expr
+=#
