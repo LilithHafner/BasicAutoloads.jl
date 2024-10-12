@@ -64,8 +64,8 @@ function (al::_Autoload)(@nospecialize(expr))
     expr
 end
 function try_autoinstall(expr::Expr)
-    isdefined(Base, :active_repl) || return
-    REPL = typeof(Base.active_repl).name.module
+    isdefined(Base, :active_repl_backend) || return
+    REPL = typeof(Base.active_repl_backend).name.module
     isdefined(REPL, :install_packages_hooks) || return
     expr.head in (:using, :import) || return
     for arg in expr.args
