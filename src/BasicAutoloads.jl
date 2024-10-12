@@ -64,13 +64,15 @@ function (al::_Autoload)(@nospecialize(expr))
     expr
 end
 function try_autoinstall(expr::Expr)
-    REPL = Base.loaded_modules[Base.PkgId(Base.UUID("3fa0cd96-eef1-5676-8a61-b3b8758bbffb"), "REPL")]
+    isdefined(Base, :active_repl_backend) || return
+    REPL = typeof(Base.active_repl_backend).name.module
     isdefined(REPL, :install_packages_hooks) || return
     expr.head in (:using, :import) || return
     for arg in expr.args
         arg isa Expr && arg.head == :. && length(arg.args) == 1 || continue
         mod = only(arg.args)
         mod isa Symbol && Base.identify_package(String(mod)) === nothing || continue
+        isempty(REPL.install_packages_hooks) && isdefined(REPL, :load_pkg) && REPL.load_pkg()
         for f in REPL.install_packages_hooks
             Base.invokelatest(f, [mod]) && break
         end
