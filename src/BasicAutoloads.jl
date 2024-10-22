@@ -12,7 +12,7 @@ export register_autoloads
 
 Register expressions to be executed when a trigger is found in the REPL's input.
 
-Eech `trigger` must be a `String`. If the `trigger` is found as a symbol (e.g. variable,
+Each `trigger` must be a `String`. If the `trigger` is found as a symbol (e.g. variable,
 function, or macro name) in an input expression to the REPL, the corresponding `expr` is
 evaluated. Each `expr` must be an `Expr` and is evaluated with `Main.eval(expr)`. Each
 unique `expr`, up to equality, is evaluated at most once.
