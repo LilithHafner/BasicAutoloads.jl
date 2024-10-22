@@ -49,6 +49,8 @@ end
 function (al::_Autoload)(@nospecialize(expr))
     if expr isa Expr
         foreach(al, expr.args)
+    elseif expr isa QuoteNode
+        al(expr.value)
     elseif expr isa Symbol
         target = get(al.dict, expr, nothing)
         target === nothing && return expr
