@@ -19,7 +19,8 @@ if isinteractive()
         ["@test", "@testset", "@test_broken", "@test_deprecated", "@test_logs",
         "@test_nowarn", "@test_skip", "@test_throws", "@test_warn", "@inferred"] =>
                                     :(using Test),
-        ["@about"]               => :(using About; macro about(x) Expr(:call, About.about, x) end),
+        ["about, @about"]        => :(using About; macro about(x) Expr(:call, About.about, x) end),
+        ["pager"]                => :(using TerminalPager),
     ])
 end
 ```
