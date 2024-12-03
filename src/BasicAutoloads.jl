@@ -100,14 +100,19 @@ struct _WaitRegisterASTTransform{T}
 end
 function (wrat::_WaitRegisterASTTransform)()
     iter = 0
-    while !isdefined(Base, :active_repl_backend) && iter < 20
-        sleep(.05)
+    while !isdefined(Base, :active_repl_backend) && iter < 30
         iter += 1
+        sleep(.02*iter)
     end
-    if isdefined(Base, :active_repl_backend) && isdefined(Base.active_repl_backend, :ast_transforms)
-        pushfirst!(Base.active_repl_backend.ast_transforms, wrat.ast_transform)
+    if isdefined(Base, :active_repl_backend)
+        if isdefined(Base.active_repl_backend, :ast_transforms)
+            pushfirst!(Base.active_repl_backend.ast_transforms, wrat.ast_transform)
+        else
+            @warn "Failed to find Base.active_repl_backend.ast_transforms. Autoloads will not work."
+        end
     else
-        @warn "Failed to find Base.active_repl_backend.ast_transforms"
+        @warn "Timed out waiting to Base.active_repl_backend to be defined. Autoloads will not work."
+        @info "If you have a slow startup file, consider moving `register_autoloads` to the end of it."
     end
 end
 
