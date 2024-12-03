@@ -112,6 +112,7 @@ function (wrat::_WaitRegisterASTTransform)()
         end
     else
         @warn "Timed out waiting to Base.active_repl_backend to be defined. Autoloads will not work."
+        @info "If you have a slow startup file, consider moving `register_autoloads` to the end of it."
     end
 end
 
