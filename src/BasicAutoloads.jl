@@ -81,13 +81,10 @@ function try_autoinstall(expr::Expr)
     end
 end
 
+is_repl_ready() = isdefined(Base, :active_repl_backend) && isdefined(Base.active_repl_backend, :ast_transforms)
 function _register_ast_transform(ast_transform)
-    if isdefined(Base, :active_repl_backend)
-        if isdefined(Base.active_repl_backend, :ast_transforms)
-            pushfirst!(Base.active_repl_backend.ast_transforms, ast_transform)
-        else
-            @warn "Failed to find Base.active_repl_backend.ast_transforms"
-        end
+    if is_repl_ready()
+        pushfirst!(Base.active_repl_backend.ast_transforms, ast_transform)
     else
         t = Task(_WaitRegisterASTTransform(ast_transform))
         schedule(t)
@@ -100,18 +97,14 @@ struct _WaitRegisterASTTransform{T}
 end
 function (wrat::_WaitRegisterASTTransform)()
     iter = 0
-    while !isdefined(Base, :active_repl_backend) && iter < 30
+    while !is_repl_ready() && iter < 30
         iter += 1
         sleep(.02*iter)
     end
-    if isdefined(Base, :active_repl_backend)
-        if isdefined(Base.active_repl_backend, :ast_transforms)
-            pushfirst!(Base.active_repl_backend.ast_transforms, wrat.ast_transform)
-        else
-            @warn "Failed to find Base.active_repl_backend.ast_transforms. Autoloads will not work."
-        end
+    if is_repl_ready()
+        pushfirst!(Base.active_repl_backend.ast_transforms, wrat.ast_transform)
     else
-        @warn "Timed out waiting to Base.active_repl_backend to be defined. Autoloads will not work."
+        @warn "Timed out waiting for `Base.active_repl_backend.ast_transforms` to become available. Autoloads will not work."
         @info "If you have a slow startup file, consider moving `register_autoloads` to the end of it."
     end
 end
