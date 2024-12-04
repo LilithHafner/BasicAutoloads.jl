@@ -82,9 +82,19 @@ function try_autoinstall(expr::Expr)
 end
 
 is_repl_ready() = isdefined(Base, :active_repl_backend) && isdefined(Base.active_repl_backend, :ast_transforms)
+function _register_ast_transform_now(ast_transform)
+    pushfirst!(Base.active_repl_backend.ast_transforms, ast_transform)
+    # Hack the autolaods into autocompletion by hijacking REPL's list of keywords.
+    # Workaround for https://github.com/JuliaLang/julia/issues/56101
+    keywords = typeof(Base.active_repl_backend).name.module.REPLCompletions.sorted_keywords
+    for trigger in keys(ast_transform.dict)
+        str = string(trigger)
+        insert!(keywords, searchsortedfirst(keywords, str), str)
+    end
+end
 function _register_ast_transform(ast_transform)
     if is_repl_ready()
-        pushfirst!(Base.active_repl_backend.ast_transforms, ast_transform)
+        _register_ast_transform_now(ast_transform)
     else
         t = Task(_WaitRegisterASTTransform(ast_transform))
         schedule(t)
@@ -102,7 +112,7 @@ function (wrat::_WaitRegisterASTTransform)()
         sleep(.02*iter)
     end
     if is_repl_ready()
-        pushfirst!(Base.active_repl_backend.ast_transforms, wrat.ast_transform)
+        _register_ast_transform_now(wrat.ast_transform)
     else
         @warn "Timed out waiting for `Base.active_repl_backend.ast_transforms` to become available. Autoloads will not work."
         @info "If you have a slow startup file, consider moving `register_autoloads` to the end of it."
