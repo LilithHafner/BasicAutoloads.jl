@@ -84,7 +84,7 @@ end
 is_repl_ready() = isdefined(Base, :active_repl_backend) && isdefined(Base.active_repl_backend, :ast_transforms)
 function _register_ast_transform_now(ast_transform)
     pushfirst!(Base.active_repl_backend.ast_transforms, ast_transform)
-    # Hack the autolaods into autocompletion by hijacking REPL's list of keywords.
+    # Hack the autoloads into autocompletion by hijacking REPL's list of keywords.
     # Workaround for https://github.com/JuliaLang/julia/issues/56101
     keywords = typeof(Base.active_repl_backend).name.module.REPLCompletions.sorted_keywords
     for trigger in keys(ast_transform.dict)
