@@ -12,8 +12,8 @@ For example, put this in your startup.jl
 
 ```julia
 if isinteractive()
-    import BasicAutoloads
-    BasicAutoloads.register_autoloads([
+    using BasicAutoloads
+    register_autoloads([
         ["@b", "@be"]            => :(using Chairmarks),
         ["@benchmark"]           => :(using BenchmarkTools),
         ["@test", "@testset", "@test_broken", "@test_deprecated", "@test_logs",
