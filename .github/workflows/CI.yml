@@ -57,6 +57,12 @@ jobs:
           - arch: x86
             version: '1'
             os: windows-latest
+          - os: macos-latest
+            version: 'lts'
+            arch: x64
+          - os: macos-latest
+            version: '1'
+            arch: aarch64
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
