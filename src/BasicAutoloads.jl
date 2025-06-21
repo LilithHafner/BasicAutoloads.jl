@@ -125,22 +125,3 @@ precompile(Tuple{BasicAutoloads._WaitRegisterASTTransform{BasicAutoloads._Autolo
 precompile(Tuple{BasicAutoloads._Autoload, Any})
 
 end
-
-#=
-API design decisions:
-Accept a very narrow type signature to force folks to always use the same approach so that
-features are inherently discoverable. You are certian to know you can X if you are forced
-to do so all the time for X in
-  - provide arbitrary exprs
-  - provide multiple triggers for a single expr
-  - provide macro names as strings instead of symbols
-
-Trivial extensions that I opted not to do
-  - Triggers are scalar or iterables of symbols or strings
-  - Expres are symbols which expand to :(using Sym)
-
-Simple, but nontrivial extensions
-  - Regex as trigger
-  - Function as trigger
-  - Function (that possibly runs multiple times) as expr
-=#
