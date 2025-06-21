@@ -41,6 +41,22 @@ jobs:
           # macOS incompatable with x86
           - arch: x86
             os: macos-latest
+
+          # Cut down CI load
+          - os: winows-latest
+            version: '1.0'
+          - os: winows-latest
+            version: '1.6'
+          - os: macos-latest
+            version: '1.6'
+          - arch: x86
+            version: 1.6
+          - arch: x64
+            version: 'lts'
+            os: windows-latest
+          - arch: x86
+            version: '1'
+            os: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
