@@ -37,6 +37,10 @@ jobs:
             arch: aarch64
           - version: '1.6'
             arch: aarch64
+
+          # macOS incompatable with x86
+          - arch: x86
+            os: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
