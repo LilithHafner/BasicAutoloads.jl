@@ -22,17 +22,50 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version:
-          - '1.0'
-          - '1.6'
-          - '1'
-          - 'nightly'
-        os:
-          - ubuntu-latest
-          - macOS-latest
-          - windows-latest
-        arch:
-          - x64
+        version: [ '1.0', '1.6', 'lts', '1', 'nightly' ]
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        arch: [ x64, x86, aarch64 ]
+        exclude:
+          # aarch64 not supported outside macOS
+          - arch: aarch64
+            os: ubuntu-latest
+          - arch: aarch64
+            os: windows-latest
+
+          # aarch64 incompatible with version 1.0 and 1.6
+          - version: '1.0'
+            arch: aarch64
+          - version: '1.6'
+            arch: aarch64
+
+          # macOS incompatable with x86
+          - arch: x86
+            os: macos-latest
+
+          # Cut down CI load
+          - os: windows-latest
+            version: '1.0'
+          - os: windows-latest
+            version: '1.6'
+          - os: macos-latest
+            version: '1.6'
+          - arch: x86
+            version: 1.6
+          - arch: x64
+            version: 'lts'
+            os: windows-latest
+          - arch: x86
+            version: '1'
+            os: windows-latest
+          - os: macos-latest
+            version: 'lts'
+            arch: x64
+          - os: macos-latest
+            version: '1'
+            arch: aarch64
+          - os: macos-latest
+            version: 'nightly'
+            arch: x64
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
