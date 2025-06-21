@@ -1,12 +1,20 @@
 function time_to_repl(args)
     code = """
+        send_user "Time: [expr {[clock milliseconds]}] ms"
         spawn julia -qi $args
-        expect {
-            -timeout 5
-            "julia>"
-        }
+        expect "julia>"
+        send_user "Time: [expr {[clock milliseconds]}] ms"
+        send "1 + 1\\n"
+        expect "2"
+        expect "julia>"
+        send_user "Time: [expr {[clock milliseconds]}] ms"
+        send "@test true\\n"
+        expect "Test Passed"
+        expect "julia>"
+        send_user "Time: [expr {[clock milliseconds]}] ms"
     """
-    @elapsed run(`expect -c "$code"`, devnull, devnull)
+    str = read(`expect -c "$code"`, String)
+    diff(parse.(Int, only.(getproperty.(eachmatch(r"Time: (\d+) ms", str), :captures)))) ./ 1000
 end
 
 function bench()
