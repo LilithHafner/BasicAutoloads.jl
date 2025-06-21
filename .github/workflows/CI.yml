@@ -43,9 +43,9 @@ jobs:
             os: macos-latest
 
           # Cut down CI load
-          - os: winows-latest
+          - os: windows-latest
             version: '1.0'
-          - os: winows-latest
+          - os: windows-latest
             version: '1.6'
           - os: macos-latest
             version: '1.6'
