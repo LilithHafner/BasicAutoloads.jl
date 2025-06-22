@@ -37,25 +37,63 @@ end
 ```
 """
 function register_autoloads(autoloads::Vector{Pair{Vector{String}, Expr}})
-    _register_ast_transform(_Autoload(autoloads))
+    if is_repl_ready()
+        _register_ast_transform(autoloads)
+    else
+        t = Task(Fix(_register_ast_transform_when_ready, (autoloads,)))
+        schedule(t)
+        isdefined(Base, :errormonitor) && Base.errormonitor(t)
+    end
     nothing
 end
 
-struct _Autoload # These callable structs are to enable precompilation.
-    dict::Dict{Symbol, Expr}
-    already_ran::Set{Expr}
-    _Autoload(autoloads) = new(Dict{Symbol, Expr}(Symbol(k) => v for (ks, v) in autoloads for k in ks), Set{Expr}())
+# This callable struct is to avoid anonomous functions which are harder to precompile.
+# We could use Base.Fix if it were not for compatability with Julia 1.10, 1.6, and 1.0.
+struct Fix{F, X}
+    f::F
+    x::X
 end
-function (al::_Autoload)(@nospecialize(expr))
+(r::Fix)(args...) = r.f(r.x..., args...)
+
+is_repl_ready() = isdefined(Base, :active_repl_backend) && isdefined(Base.active_repl_backend, :ast_transforms)
+function _register_ast_transform_when_ready(autoloads)
+    iter = 0
+    while !is_repl_ready() && iter < 30
+        iter += 1
+        sleep(.02*iter)
+    end
+    if is_repl_ready()
+        _register_ast_transform(autoloads)
+    else
+        @warn "Timed out waiting for `Base.active_repl_backend.ast_transforms` to become available. Autoloads will not work."
+        @info "If you have a slow startup file, consider moving `register_autoloads` to the end of it."
+    end
+end
+
+function _register_ast_transform(autoloads)
+    dict = Dict{Symbol, Expr}(Symbol(k) => v for (ks, v) in autoloads for k in ks)
+    pushfirst!(Base.active_repl_backend.ast_transforms, Fix(autoload, (dict, Set{Expr}())))
+    # Hack the autoloads into autocompletion by hijacking REPL's list of keywords.
+    # Workaround for https://github.com/JuliaLang/julia/issues/56101
+    keywords = typeof(Base.active_repl_backend).name.module.REPLCompletions.sorted_keywords
+    for trigger in keys(dict)
+        str = string(trigger)
+        insert!(keywords, searchsortedfirst(keywords, str), str)
+    end
+end
+
+function autoload(dict::Dict{Symbol, Expr}, already_ran::Set{Expr}, @nospecialize(expr))
     if expr isa Expr
-        foreach(al, expr.args)
+        foreach(expr.args) do expr
+            autoload(dict, already_ran, expr)
+        end
     elseif expr isa QuoteNode
-        al(expr.value)
+        autoload(dict, already_ran, expr.value)
     elseif expr isa Symbol
-        target = get(al.dict, expr, nothing)
+        target = get(dict, expr, nothing)
         target === nothing && return expr
-        target in al.already_ran && return expr
-        push!(al.already_ran, target)
+        target in already_ran && return expr
+        push!(already_ran, target)
         try
             try_autoinstall(target)
             Main.eval(target)
@@ -81,47 +119,9 @@ function try_autoinstall(expr::Expr)
     end
 end
 
-is_repl_ready() = isdefined(Base, :active_repl_backend) && isdefined(Base.active_repl_backend, :ast_transforms)
-function _register_ast_transform_now(ast_transform)
-    pushfirst!(Base.active_repl_backend.ast_transforms, ast_transform)
-    # Hack the autoloads into autocompletion by hijacking REPL's list of keywords.
-    # Workaround for https://github.com/JuliaLang/julia/issues/56101
-    keywords = typeof(Base.active_repl_backend).name.module.REPLCompletions.sorted_keywords
-    for trigger in keys(ast_transform.dict)
-        str = string(trigger)
-        insert!(keywords, searchsortedfirst(keywords, str), str)
-    end
-end
-function _register_ast_transform(ast_transform)
-    if is_repl_ready()
-        _register_ast_transform_now(ast_transform)
-    else
-        t = Task(_WaitRegisterASTTransform(ast_transform))
-        schedule(t)
-        isdefined(Base, :errormonitor) && Base.errormonitor(t)
-    end
-end
-
-struct _WaitRegisterASTTransform{T}
-    ast_transform::T
-end
-function (wrat::_WaitRegisterASTTransform)()
-    iter = 0
-    while !is_repl_ready() && iter < 30
-        iter += 1
-        sleep(.02*iter)
-    end
-    if is_repl_ready()
-        _register_ast_transform_now(wrat.ast_transform)
-    else
-        @warn "Timed out waiting for `Base.active_repl_backend.ast_transforms` to become available. Autoloads will not work."
-        @info "If you have a slow startup file, consider moving `register_autoloads` to the end of it."
-    end
-end
-
-precompile(Tuple{typeof(Base.vect), Pair{Array{String, 1}, Expr}, Vararg{Pair{Array{String, 1}, Expr}}})
-precompile(Tuple{typeof(BasicAutoloads.register_autoloads), Array{Pair{Array{String, 1}, Expr}, 1}})
-precompile(Tuple{BasicAutoloads._WaitRegisterASTTransform{BasicAutoloads._Autoload}})
-precompile(Tuple{BasicAutoloads._Autoload, Any})
+precompile(Tuple{typeof(Base.vect), Pair{Vector{String}, Expr}, Vararg{Pair{Vector{String}, Expr}}})
+precompile(Tuple{typeof(BasicAutoloads.register_autoloads), Vector{Pair{Vector{String}, Expr}}})
+precompile(Tuple{Fix{typeof(_register_ast_transform_when_ready), Tuple{Vector{Pair{Vector{String}, Expr}}}}})
+precompile(Tuple{Fix{typeof(autoload), Tuple{Dict{Symbol, Expr}, Set{Expr}}}, Expr})
 
 end
