@@ -32,7 +32,7 @@ if isinteractive()
         "@test_nowarn", "@test_skip", "@test_throws", "@test_warn", "@inferred"] =>
                                     :(using Test),
         ["pager"]                => :(using TerminalPager),
-        ["cowsay"]               => :(cowsay(x) = println("Cow: \"$x\"")),
+        ["cowsay"]               => :(cowsay(x) = println("Cow: \"\$x\"")),
     ])
 end
 ```
