@@ -48,7 +48,7 @@ function register_autoloads(autoloads::Vector{Pair{Vector{String}, Expr}})
     nothing
 end
 
-# This callable struct is to avoid anonomous functions which are harder to precompile.
+# This callable struct is to avoid anonymous functions which are harder to precompile.
 # We could use Base.Fix if it were not for compatability with Julia 1.10, 1.6, and 1.0.
 struct Fix{F, X}
     f::F
