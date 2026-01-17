@@ -49,7 +49,7 @@ For more details, see the [docstring of `register_autoloads`](https://github.com
 ## API design decisions
 
 Accept a very narrow type signature to force folks to always use the same approach so that
-features are inherently discoverable. You are certian to know you can X if you are forced
+features are inherently discoverable. You are certain to know you can X if you are forced
 to do so all the time for X in
   - provide arbitrary exprs
   - provide multiple triggers for a single expr
