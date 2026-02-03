@@ -59,7 +59,7 @@ end
 is_repl_ready() = isdefined(Base, :active_repl_backend) && isdefined(Base.active_repl_backend, :ast_transforms)
 function _register_ast_transform_when_ready(autoloads)
     iter = 0
-    while !is_repl_ready() && iter < 30
+    while !is_repl_ready() && iter < 120
         iter += 1
         sleep(.02*iter)
     end
