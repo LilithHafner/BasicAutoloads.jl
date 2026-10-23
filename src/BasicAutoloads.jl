@@ -73,10 +73,15 @@ end
 
 function _register_ast_transform(autoloads)
     dict = Dict{Symbol, Expr}(Symbol(k) => v for (ks, v) in autoloads for k in ks)
-    pushfirst!(Base.active_repl_backend.ast_transforms, Fix(autoload, (dict, Set{Expr}())))
+    # REPLBackend uses the default getproperty on all supported Julia versions, so
+    # getfield is equivalent here and avoids dynamic getproperty compilation.
+    transforms = getfield(Base.active_repl_backend, :ast_transforms)::Vector{Any}
+    pushfirst!(transforms, Fix(autoload, (dict, Set{Expr}())))
     # Hack the autoloads into autocompletion by hijacking REPL's list of keywords.
     # Workaround for https://github.com/JuliaLang/julia/issues/56101
-    keywords = typeof(Base.active_repl_backend).name.module.REPLCompletions.sorted_keywords
+    # The dynamic module lookup hides the Vector{String} from inference.
+    completions = typeof(Base.active_repl_backend).name.module.REPLCompletions::Module
+    keywords = completions.sorted_keywords::Vector{String}
     for trigger in keys(dict)
         str = string(trigger)
         insert!(keywords, searchsortedfirst(keywords, str), str)
@@ -85,8 +90,8 @@ end
 
 function autoload(dict::Dict{Symbol, Expr}, already_ran::Set{Expr}, @nospecialize(expr))
     if expr isa Expr
-        foreach(expr.args) do expr
-            autoload(dict, already_ran, expr)
+        for arg in expr.args
+            autoload(dict, already_ran, arg)
         end
     elseif expr isa QuoteNode
         autoload(dict, already_ran, expr.value)
@@ -113,13 +118,16 @@ function try_autoinstall(expr::Expr)
         arg isa Expr && arg.head == :. && length(arg.args) == 1 || continue
         mod = only(arg.args)
         mod isa Symbol && Base.identify_package(String(mod)) === nothing || continue
-        isempty(REPL.install_packages_hooks) && isdefined(REPL, :load_pkg) && REPL.load_pkg()
-        for f in REPL.install_packages_hooks
+        hooks = REPL.install_packages_hooks::Vector{Any}
+        isempty(hooks) && isdefined(REPL, :load_pkg) && REPL.load_pkg()
+        for f in hooks
             Base.invokelatest(f, [mod]) && break
         end
     end
 end
 
+precompile(Tuple{Type{Pair}, Vector{String}, Expr})
+precompile(Tuple{typeof(Base.vect), Pair{Vector{String}, Expr}})
 precompile(Tuple{typeof(Base.vect), Pair{Vector{String}, Expr}, Vararg{Pair{Vector{String}, Expr}}})
 precompile(Tuple{typeof(BasicAutoloads.register_autoloads), Vector{Pair{Vector{String}, Expr}}})
 precompile(Tuple{Fix{typeof(_register_ast_transform_when_ready), Tuple{Vector{Pair{Vector{String}, Expr}}}}})
